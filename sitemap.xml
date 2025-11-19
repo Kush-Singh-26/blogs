@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <url>
+          <loc>/blog-temp/</loc>
+          <lastmod>2025-11-19</lastmod>
+      </url>
+      <url>
+          <loc>/blog-temp/hello-world.html</loc>
+      </url>
+      <url>
+          <loc>/blog-temp/transformer.html</loc>
+      </url>
+      <url>
+          <loc>/blog-temp/tags/transformers.html</loc>
+      </url>
+      <url>
+          <loc>/blog-temp/tags/ai.html</loc>
+      </url>
+      <url>
+          <loc>/blog-temp/tags/deep learning.html</loc>
+      </url>
+  </urlset>

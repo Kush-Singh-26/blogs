@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>#ai</title>
+    <meta name="description" content="">
+    
+    <link rel="stylesheet" href="/blog-temp/static/css/katex.min.css">
+    
+    <style>
+         
+         
+         
+        :root {
+            --bg-body: #2E3440; --bg-card: #3B4252; --bg-code: #434C5E;
+            --text-main: #D8DEE9; --text-muted: #E5E9F0;
+            --accent-prim: #88C0D0; --accent-sec:  #81A1C1; --accent-tert: #5E81AC;
+            --success: #A3BE8C;
+        }
+        body { background-color: var(--bg-body); color: var(--text-main); font-family: sans-serif; line-height: 1.7; max-width: 840px; margin: 0 auto; padding: 2rem; }
+        a { color: var(--accent-prim); text-decoration: none; }
+        header { margin-bottom: 3rem; border-bottom: 1px solid var(--bg-card); padding-bottom: 1rem; display:flex; justify-content:space-between;}
+        .tag-pill { background: var(--bg-card); padding: 0.5rem 1rem; border-radius: 50px; margin-right: 0.5rem; display: inline-block; }
+        img { max-width: 100%; }
+        pre { background: var(--bg-code) !important; padding: 1rem; overflow-x: auto; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/blog-temp/index.html" style="font-weight:bold; color: white;">MY BLOG</a>
+        <nav>
+            <a href="/blog-temp/tags/index.html">Tags</a>
+            <a href="/blog-temp/index.html" style="margin-left: 15px;">Home</a>
+        </nav>
+    </header>
+
+    <main>
+        
+            
+            <h2>Recent Posts</h2>
+            <ul>
+                
+                <li style="margin-bottom: 1rem;">
+                    <a href="/blog-temp/transformer.html" style="font-size:1.2rem; font-weight:bold">Transformer Deep Dive</a>
+                    <div>A complete guide to the transformer architecture, attention mechanisms, and positional encoding.</div>
+                </li>
+                
+            </ul>
+        
+    </main>
+
+    <script defer src="/blog-temp/static/js/katex.min.js"></script>
+    <script defer src="/blog-temp/static/js/auto-render.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\(', right: '\\)', display: false},
+                    {left: '\\[', right: '\\]', display: true}
+                ],
+                throwOnError : false
+            });
+        });
+    </script>
+</body>
+</html>

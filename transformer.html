@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformer Deep Dive</title>
+    <meta name="description" content="A complete guide to the transformer architecture, attention mechanisms, and positional encoding.">
+    
+    <link rel="stylesheet" href="/blog-temp/static/css/katex.min.css">
+    
+    <style>
+         
+         
+         
+        :root {
+            --bg-body: #2E3440; --bg-card: #3B4252; --bg-code: #434C5E;
+            --text-main: #D8DEE9; --text-muted: #E5E9F0;
+            --accent-prim: #88C0D0; --accent-sec:  #81A1C1; --accent-tert: #5E81AC;
+            --success: #A3BE8C;
+        }
+        body { background-color: var(--bg-body); color: var(--text-main); font-family: sans-serif; line-height: 1.7; max-width: 840px; margin: 0 auto; padding: 2rem; }
+        a { color: var(--accent-prim); text-decoration: none; }
+        header { margin-bottom: 3rem; border-bottom: 1px solid var(--bg-card); padding-bottom: 1rem; display:flex; justify-content:space-between;}
+        .tag-pill { background: var(--bg-card); padding: 0.5rem 1rem; border-radius: 50px; margin-right: 0.5rem; display: inline-block; }
+        img { max-width: 100%; }
+        pre { background: var(--bg-code) !important; padding: 1rem; overflow-x: auto; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/blog-temp/index.html" style="font-weight:bold; color: white;">MY BLOG</a>
+        <nav>
+            <a href="/blog-temp/tags/index.html">Tags</a>
+            <a href="/blog-temp/index.html" style="margin-left: 15px;">Home</a>
+        </nav>
+    </header>
+
+    <main>
+        
+            <article>
+                <h1>Transformer Deep Dive</h1>
+                
+                <div style="margin-bottom: 2rem;">
+                    
+                        <a href="/blog-temp/tags/ai.html" class="tag-pill" style="font-size:0.8em">#AI</a>
+                    
+                        <a href="/blog-temp/tags/deep%20learning.html" class="tag-pill" style="font-size:0.8em">#Deep Learning</a>
+                    
+                        <a href="/blog-temp/tags/transformers.html" class="tag-pill" style="font-size:0.8em">#Transformers</a>
+                    
+                </div>
+                
+                <h1>Attention Is All You Need Deep Dive</h1>
+<p>Transformer architecture was introduced in the paper <strong>&quot;Attention is All You Need&quot;</strong> by <a href="https://arxiv.org/pdf/1706.03762" target="_blank" rel="noopener noreferrer">Vaswani et al.</a> in the year 2017. Transformers allowed to understand the relationships between all parts of an input parallelly. This allowed much faster training, better performance, and superior handling of complex tasks like language translation, summarization, and text generation than previous models/architectures like RNNs or LSTMs.
+<br>
+Transformers are the backbone of all the modern AI advancement. From language modelling to vision all the SOTA (State Of The Art) models utilize transformers.
+<br><br>
+This post will be broken down into the following subparts :</p>
+<ol>
+<li><strong>Background</strong></li>
+<li><strong>Transformer Architecture Overview</strong></li>
+<li><strong>Position-wise fully connected feed-forward network</strong></li>
+<li><strong>Scaled Dot-Product Attention</strong></li>
+<li><strong>Multi-Head Attention</strong></li>
+<li><strong>Masked Multi-Head Attention (MHA)</strong></li>
+<li><strong>Types of MHA Used</strong></li>
+<li><strong>Embedding &amp; Positional Encoding</strong></li>
+</ol>
+<h1>1. Background</h1>
+<ul>
+<li>
+<p>Recurrent Neural Networks (RNNs) process the input sequence token-by-token which doesn't allow for parallelization. This makes the training process slow.</p>
+</li>
+<li>
+<p>RNNs tend to forget distant context due to vanishing gradients (even with LSTMs and GRUs). This makes them unreliablle for understanding long sequences.</p>
+</li>
+<li>
+<p>CNNs (Convolutional Neural Network) are parallelizable but they also struggle to model dependencies between distant tokens.</p>
+</li>
+<li>
+<p>Attention models (like <a href="https://kush-singh-26.github.io/blogs/2025/05/28/Attention.html" target="_blank" rel="noopener noreferrer">Bahdanu</a> and Luong Attention) were imporoving tasks like translation and summarization.</p>
+</li>
+<li>
+<p>The Transformer architecture took the idea of attention and made it the core component, eliminating the need for recurrence or convolutions entirely.</p>
+</li>
+</ul>
+<h1>2. Transformer Architecture Overview</h1>
+<img src="/static/images/Transformer1.png" alt="Image" width="450" height="550">
+<ul>
+<li>The model consists of an <strong>encoder</strong> and a <strong>decoder</strong>.</li>
+</ul>
+<h2>Encoder</h2>
+<ul>
+<li>The encoder consists of a stack of 6 identical layers, which inturn consists of <em>2 sub-layers</em> (from bottom to top) :
+<ol>
+<li><strong>Multi-head-self-attention mechanism</strong></li>
+<li><strong>Position-wise fully connected feed-forward network</strong></li>
+</ol>
+</li>
+</ul>
+<blockquote>
+<p><strong>A residual connection is applied around each of the 2 sub-layers, follwed by layer normalization.</strong></p>
+</blockquote>
+<h3>Residual Connection</h3>
+<ul>
+<li>It is a shortcut path that bypasses a layer and adds the input of the layer directly to its output.</li>
+<li>So, if $ F(x) = \text{SelfAttention}(x) \, or \, F(x) = \text{FFN}(x) $ , with $ x $ being the input to the sublayer $ F(x) $ , then :</li>
+</ul>
+$$ \text{Sum} = x + F(x) $$
+<ul>
+<li>
+<p>So, the input goes into the sublayer and also around it via the residual connection (<em>Skip Connection</em>).</p>
+</li>
+<li>
+<p>It allows the model to preserve information through the layers and learn only the difference (residual).</p>
+</li>
+</ul>
+<h3>Layer Norm</h3>
+<p>Before understanding Layer Norm it is important to undersatnd why it is needed.</p>
+<h4>Internal Covariate Shift</h4>
+<ul>
+<li>
+<p>It is the phenomenon where the inputs to a layer (activations) keep changing as the parameters of the previous layers update during training.</p>
+</li>
+<li>
+<p>This causes each layer to constantly adapt to new input distributions which causes learning to be slow and unstable.</p>
+</li>
+<li>
+<p>Gradient descent struggles because it keeps chasing a moving target.</p>
+</li>
+<li>
+<p>It is used to normalize the activations across the features of a single data point.</p>
+</li>
+</ul>
+<blockquote>
+<p>Let $x$ ( of shape <code>[batch size, feature dimension]</code> ) be the batch of inputs to the network :
+<br><br>
+</p>
+$$
+x = 
+\begin{bmatrix}
+x_{11} & x_{12} & \cdots & x_{1H} \\
+x_{21} & x_{22} & \cdots & x_{2H} \\
+\vdots & \vdots & \ddots & \vdots \\
+x_{B1} & x_{B2} & \cdots & x_{BH}
+\end{bmatrix}
+$$
+<p>
+<br><br></p>
+</blockquote>
+<ul>
+<li>
+<p>Then,</p>
+<ul>
+<li>Each row $ x_i \in \mathbb{R}^{H} $ is a single data point.</li>
+<li>Each column represents a feature</li>
+</ul>
+</li>
+<li>
+<p>Layer Norm operates on each row independently.</p>
+</li>
+<li>
+<p>For each data point $ x = [x_1,x_2,\dots,x_H] $ (H = number of hidden units (features)), Layer Norm computes :</p>
+<ul>
+<li>
+<h5><strong>Mean</strong> :</h5>
+<ul>
+<li>$$ \mu = \frac{1}{H} \sum_{i=1}^H x_i $$</li>
+</ul>
+</li>
+<li>
+<h5><strong>Variance</strong> :</h5>
+<ul>
+<li>$$ \sigma^2 = \frac{1}{H} \sum_{i=1}^H (x_i - \mu)^2 $$</li>
+</ul>
+</li>
+<li>
+<h5><strong>Normalize</strong> :</h5>
+<ul>
+<li>$$ \hat x_i = \frac{x_i - \mu}{\sqrt{\sigma^2 + \epsilon}} $$</li>
+</ul>
+</li>
+<li>
+<h5><strong>Scale &amp; Shift</strong> :</h5>
+<ul>
+<li>$$ y_i = \gamma_i \hat x_i + \beta_i $$</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p>$ \gamma $ &amp; $ \beta $ are learnable parameters and are of same size as x.</p>
+</li>
+<li>
+<p>$ \epsilon $ is a small constant to avoid division by 0.</p>
+</li>
+<li>
+<p>Nerworks train better and faster when the inputs to each layer have <em>0 mean</em> and <em>unit variance</em>.</p>
+</li>
+<li>
+<p>Layer Norm helps in stabilizing learning and improves convergence speed.</p>
+</li>
+</ul>
+<hr>
+<p>Thus, the flow of operations for each sublayer is like :</p>
+$$ \text{Output}_1 = \text{LayerNorm} (x + \text{SelfAttention}(x)) $$
+$$ \text{Output}_2 = \text{LayerNorm} (\text{Output}_1 + \text{FFN}(\text{Output}_1)) $$
+<blockquote>
+<p>The outputs of each sub-layer as well as the embedding layer are of the same dimensions. In the paper it was $ d_{model} $ = 512.</p>
+</blockquote>
+<h2>Decoder</h2>
+<ul>
+<li>
+<p>Decoder is also very similar to the <em>Encoder</em>.</p>
+</li>
+<li>
+<p>It consists of a stack of 6 identical layers.</p>
+</li>
+<li>
+<p>Each layer consists of <em>3 sub-layers</em> (from bottom to top) :</p>
+<ol>
+<li><strong>Masked Multi-Head Attention</strong></li>
+<li><strong>Multi-Head Attention</strong> (over the output of the encoder stack)</li>
+<li><strong>Position-wise fully connected feed-forward network</strong></li>
+</ol>
+</li>
+<li>
+<p>And just like in <em>Encoder</em> here also residual connections are employed around each sub-layer followed by layer normalization.</p>
+</li>
+</ul>
+<h1>3. Position-wise fully connected feed-forward network</h1>
+<ul>
+<li>It is a 2 layer <a href="https://kush-singh-26.github.io/blogs/2025/03/17/NN-MLP.html" target="_blank" rel="noopener noreferrer">MLP</a> (Multi Layer Perceptron) applied independently to each position (token vector) in the input sequence.</li>
+</ul>
+$$ \boxed{ \text{FFN}(x) = \max{(0, xW_1 + b_1)}W_2 + b_2 } $$
+<ul>
+<li>
+<p>Where,</p>
+<ul>
+<li>$ x \in \mathbb{R}^{d_{model}} $ : It is the input vector (eg. 512-dimensional)</li>
+<li>$ W_1 \in \mathbb{R}^{d_{model} \times d_{ff}} $ : Weight matrix 1 (eg. $ d_{ff} = 2048 $)</li>
+<li>$ W_2 \in \mathbb{R}^{d_{ff} \times d_{model}} $ : Weight matrix 2</li>
+<li>$ b_1 $ and $ b_2 $ : Bias vectors</li>
+<li>$ \max{(0, \cdot)} $ : ReLU activation</li>
+</ul>
+</li>
+<li>
+<p>This 2 layer MLP is applied at each position (token) vector independently / separately.</p>
+</li>
+<li>
+<p>There is no interaction between tokens during this step and each token in processed using the same network.</p>
+</li>
+</ul>
+<blockquote>
+<p>It transforms each token's representation individually allowing the model to re-map the token into a richer space (a (vector) space where token representations carry more complex and contextual information) after gathering context via the attention layer.</p>
+</blockquote>
+<img src="/static/images/Transformer2.png" alt="Image" width="800" height="500">
+<h1>4. Scaled Dot Product Attention</h1>
+<p><a href="https://kush-singh-26.github.io/blogs/2025/05/28/Attention.html" target="_blank" rel="noopener noreferrer"><strong>Attention</strong></a> allows the model to dynamically focus on the different parts of the input sequence when processing each token. A <strong>weighted representation</strong> of the entire input sequence for each token is computed so that the model can selectively <strong>attend to</strong> the most relevant words. This information is captured using a <em>usefulness score</em>.</p>
+<ul>
+<li>The concept of <em>Queries</em>, <em>Keys</em>, and <em>Values</em> is used to compute attention.</li>
+<li>Consider a database which consists of some <strong>Key-Value</strong> pairs.</li>
+<li>To retrieve information from the database a <strong>query</strong> is issued.</li>
+<li>The given query is compared to all the keys stored in the database to compute similarity scores.</li>
+<li>Based on these scores, the most relevant <strong>values</strong> are returned.</li>
+</ul>
+<img src="/static/images/Transformer3.png" alt="Image" width="750" height="350">
+<ul>
+<li>The above analogy can be used to understand <em>Queries</em>, <em>Keys</em>, and <em>Values</em> in context of attention.</li>
+</ul>
+<blockquote>
+<ul>
+<li>To compute the attention of a word in one sentence with respect to all words in another sentence :
+- Create a Query vector for the word.
+- Create Key and Value vectors for each word in the second sentence.
+- Compute the similarity between the Query and each Key.
+- It gives the raw attention score for each word in the second sentence.
+- Pass the resulting scores through a softmax function, turning them into a probability distribution.
+- It converts the scores into a set of positive weights that all sum up to 1.
+- Each weight represents how much attention the query word should pay to each value.
+- Compute the weighted sum of all the value vectors using the softmax weights.
+- This results in a single output vector which is just the enriched version of the original word representation with relevant context from other sentence.</li>
+</ul>
+</blockquote>
+<h2>Mathematical formulation of Scaled Dot Product Attention</h2>
+<ul>
+<li>
+<p>$ X = [x_1, x_2, \cdots, x_n] \in \mathbb{R}^{n \times d_{model}} $</p>
+<ul>
+<li>$ X $ is the matrix of all vectorized tokens in the input sequence of length $ n $ where each token is of dimensionality $ d_{model} $.</li>
+<li>$ x_i \in \mathbb{R}^{d_{model}} $ is the embedding vector of the $ i^{th} $ token.</li>
+</ul>
+</li>
+<li>
+<p>To compute attention between these tokens, their vector embeddings are <em>projected into 3 new vector spaces</em> using learned matrices.</p>
+</li>
+</ul>
+$$
+\boxed{
+\begin{array}{rl}
+Q &= XW^Q \quad \text{(queries)} \quad \in \mathbb{R}^{n \times d_k} \\
+K &= XW^K \quad \text{(keys)} \quad \in \mathbb{R}^{n \times d_k} \\
+V &= XW^V \quad \text{(values)} \quad \in \mathbb{R}^{n \times d_v}
+\end{array}
+}
+$$
+<blockquote>
+<p>$ Q $, $ K $ &amp; $ V $ are the linear transformations of $ X $.</p>
+</blockquote>
+<blockquote>
+<ul>
+<li>$Q$ and $K$ are of same dimensionality as their dot product is calculate which requires them to be of same dimensionality.</li>
+</ul>
+</blockquote>
+<ul>
+<li>
+<p>$V$ can have different dimension because it is not used for any dot product calculation but for just weighted sum.</p>
+</li>
+<li>
+<p>Where :</p>
+<ul>
+<li>$ W^Q \in \mathbb{R}^{d_{model} \times d_k} $</li>
+<li>$ W^K \in \mathbb{R}^{d_{model} \times d_k} $</li>
+<li>$ W^V \in \mathbb{R}^{d_{model} \times d_v} $</li>
+</ul>
+</li>
+<li>
+<p>These are the learned parameters / weights of the model.</p>
+</li>
+<li>
+<p>They may be of different dimensionalities.</p>
+</li>
+</ul>
+<img src="/static/images/Transformer5.png" alt="Image" width="750" height="450">
+<p>The main idea behind <strong>scaled dot product attention</strong> mechanism is to :</p>
+<ol>
+<li>Compare each <em>query</em> with all the <em>keys</em> to get attention weights.</li>
+<li>Use these weights to compute a weighted sum over the <em>values</em>.</li>
+</ol>
+<h3>a. Dot Product</h3>
+<blockquote>
+<ul>
+<li>Similarity between the query and key is computed using their <strong>dot product</strong>.
+$ q \cdot k = \sum_{j=1}^d q_j k_j = \left\lVert q \right\rVert \left\lVert k \right\rVert \cos\theta $</li>
+</ul>
+</blockquote>
+<ul>
+<li>If $ \cos\theta $ is 1 then the vectors are aligned and if they are orthogonal then it will be 0.</li>
+<li>Thus, dot product increases with alignment and is considered <u>unnormalized similarity measure</u>.</li>
+</ul>
+<p>Thus the <strong>attention scores</strong> are computed as :</p>
+$$ \boxed{\text{scores} = QK^T \in \mathbb{R}^{n \times n}} $$
+<ul>
+<li>Where each element's score [ $ scores_{ij} = q_i \cdot k_j $ ] represents how much each token $ i $ attends to token $ j $.</li>
+</ul>
+<h3>b. Scaling</h3>
+<ul>
+<li>Now the scores are <em>scaled</em>. If the dimensionality of the vectors is large (eg. $ d_k  = 512 $), then the dot product can produce large values.</li>
+<li>When these scores are passed through softmax function, the output will have one element get all the attention and others nearly 0.</li>
+<li>This leads to vanishing gradients problem during training as very small gradients may be generated.</li>
+</ul>
+<blockquote>
+<p>Thus the scores (dot product) is scaled by $ \sqrt{d_k} $ (square root of the key dimension).</p>
+</blockquote>
+$$ \boxed{\text{scaled scores} = \frac{QK^T}{\sqrt{d_k}} } $$
+<h3>c. Applying Softmax</h3>
+$$ \text{softmax}(z)_i = \frac{\exp{z_i}}{\sum_{j=1}^N \exp{z_j}} $$
+<p> function is applied row-wise, i.e. for each token $ i $, $ \alpha_i = \text{softmax}(\frac{q_i \cdot K^T}{\sqrt{d_k}}) $ is computed.</p>
+<ul>
+<li>This gives a probability distribution over all n tokens in the sequence.</li>
+<li>$ \alpha_{ij} $ tells how much attention token $i$ pays to token $j$.</li>
+<li>Thus,</li>
+</ul>
+$$ \boxed{ \alpha = softmax(\frac{QK^T}{\sqrt{d_k}}) \in \mathbb{R}^{n \times n} } $$
+<ul>
+<li>Each row of $\alpha$ matrix corresponds to one token's attention distribution over all tokens in the sequence including itself.</li>
+<li>Each row being a probability distribution sums to 1.</li>
+<li>softmax returns a vector when a vector is passed to it but a matrix when a matrix is passed to it where each row is a softmaxed vector.</li>
+</ul>
+<h3>d. Multiply with Values</h3>
+$$ \boxed{ Attention(Q,K,V) = softmax(\frac{QK^T}{\sqrt{d_k}})V \in {n \times d_v}}$$
+<ul>
+<li>It is same as $\alpha V $.</li>
+<li>Each row $\alpha_i$ is the attention distribution (weights) for token $i$ and $V$ contains the all the value vectors for all tokens (one per row).</li>
+</ul>
+<blockquote>
+<p>Thus, $ \alpha_i V = \sum_{j=1}^n \alpha_{ij} v_j $ resembles computing a weighted sum of all the value vectors where weights are how much attention token $i$ pays to token $j$.</p>
+</blockquote>
+<blockquote>
+<p>This gives a <strong>new vector representation</strong> for token $i$, which <strong>summarizes information from the whole sequence</strong>, weightd by attention.</p>
+</blockquote>
+<img src="/static/images/Transformer4.png" alt="Image" width="450" height="450">
+<h1>5. Multi-Head Attention</h1>
+<ul>
+<li>
+<p>Multi-head attention takes the scaled dot-product attention a step further by performing it multiple times in parallel with different learned linear projections of the queries, keys and values.</p>
+</li>
+<li>
+<p>An <strong>Attention-Head</strong> is just one instance of performing scaled dot-product attention.</p>
+<ul>
+<li>It is just an attention layers.</li>
+<li>It focuses on learning a specific aspect or relationship in the data.</li>
+</ul>
+</li>
+<li>
+<p>Multiple heads are used parallely, allowing each head to attend to different parts of the input representation space.</p>
+</li>
+<li>
+<p>Let : $h$ : number of head (in the paper $h = 8$)</p>
+</li>
+<li>
+<p>$ d_{model} $ : dimension of model</p>
+</li>
+<li>
+<p>$ d_k = d_v = \frac{d_{model}}{h} $ : dimension of each head</p>
+</li>
+<li>
+<p>$X$ : Layer Input of shape <code>[batch_size, seq_len, d_model]</code></p>
+<ul>
+<li>eg. <code>[32, 50, 512]</code> (32 sentences, 50 tokens each, 512-dim embedding).</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<ul>
+<li>Reduced dimension of each head results in a similar total computation costs as that of single-head attention with full dimensionality.</li>
+</ul>
+</blockquote>
+<ul>
+<li>
+<p>But single attention head will not allow the model to jointly attend to information from different representation subspaces at different positions.</p>
+</li>
+<li>
+<p>There are <em>2 ways</em> to understand Multi-Head Attention (MHA).</p>
+</li>
+<li>
+<p><strong>Both ways are mathematically equivalent</strong>.</p>
+</li>
+<li>
+<p>They differ in their computational arrangements.</p>
+<ol>
+<li>
+<h5>The Conceptual Model :</h5>
+<ul>
+<li>It is the same approach as mentioned in the original paper.</li>
+<li>It explains the idea of multiple heads learning different feature representations in parallel.</li>
+</ul>
+</li>
+<li>
+<h5>The Practical Implementation :</h5>
+<ul>
+<li>It is the optimized approach used in modern deep-learning libraries (PyTorch &amp; TensorFlow).</li>
+<li>It reframes the computation into a single, large, batched operation.</li>
+<li>It is designed to be efficient on GPU hardware.</li>
+</ul>
+</li>
+</ol>
+</li>
+</ul>
+<h2>The Conceptual Model</h2>
+<ul>
+<li>This model follows a logic like : $ create \rightarrow split \rightarrow process $.</li>
+</ul>
+<blockquote>
+<p>Create main / master <strong>$Q$,$K$,$V$</strong> matrices and then for each head independently project these down to smaller dimension and then calculate attention.</p>
+</blockquote>
+<h3>1. Initial Generation of Master Q,K,V :</h3>
+$$
+\begin{array}{rl}
+Q &= X W_{master}^Q \\
+K &= XW_{master}^K  \\
+V &= XW_{master}^V 
+\end{array}
+$$
+<ul>
+<li>The input embeddings $X$ are projected onto $Q,K,V$ matrices.</li>
+<li>$W_{master}^y$ are learnable weight matrices each with a shape <code>[d_model, d_model]</code> (eg. <code>[512, 512]</code>).</li>
+<li>Resulting <strong>$Q$,$K$,$V$</strong> matrices are the inputs to the MHA each of shape : <code>[batch_size, seq_len, d_model]</code> (eg. <code>[32, 50, 512]</code>).</li>
+</ul>
+<h3>2. Split : [Head-specific Projections]</h3>
+<ul>
+<li>For each head $i$ a second set of learned linear projections are defined.</li>
+<li>Weight matrices for each head $i$ : $W_i^Q, W_i^K, W_i^V$ are of shape <code>[d_model, d_k]</code> (e.g., <code>[512, 64]</code>).</li>
+</ul>
+$$
+\begin{array}{rl}
+Q_i &= QW_{i}^Q \\
+K_i &= KW_{i}^K  \\
+V_i &= VW_{i}^V 
+\end{array}
+$$
+<ul>
+<li>$Q$,$K$,$V$ matrices are projected through each head to create the inputs for that specific head.</li>
+<li>Resulting shape of $Q_i$,$K_i$,$V_i$: <code>[32, 50, 64]</code>.</li>
+<li>This step is performed in parallel for all 8 heads.</li>
+</ul>
+<h3>3. Parallel Attention Calculation</h3>
+$$ head_i = Attention(Q_i,K_i,V_i) = softmax(\frac{Q_i K_i^T}{\sqrt{d_k}}) V_i $$
+<ul>
+<li>Each head independently calculates the attention score using its unique $Q_i, K_i, V_i$.</li>
+<li>The output for each $head_i$ is a tensor of shape <code>[32, 50, 64]</code>.</li>
+</ul>
+<h3>4. Concatenation and Final Projection</h3>
+<ul>
+<li>
+<p>Outputs from all 8 heads are concatenated along the last dimension.</p>
+<ul>
+<li><code>(batch, seq, 64)</code> $ \times $ 8 = <code>(batch, seq, 512)</code> = <code>(32, 50, 512)</code></li>
+</ul>
+</li>
+<li>
+<p>The concatenated tensor is passed through one last linear projection $W^O$ of shape <code>[512, 512]</code> to produce the final MHA output.</p>
+</li>
+</ul>
+$$ \text{MHA Output} = Concat(head_1, \cdots, head_8) W^O$$
+<img src="/static/images/Transformer6.png" alt="Image" width="500" height="550">
+<h2>The Practical Implementation</h2>
+<ul>
+<li>This model follows a logic like : $ project \rightarrow split $.</li>
+</ul>
+<blockquote>
+<p>Perform one large projection that contains all head projections at once and then reshape the result to get the separate heads.</p>
+</blockquote>
+<h3>1. Fusing the projection steps</h3>
+<ul>
+<li>
+<p>The projections steps (1 &amp; 2 steps of the <em>conceptual model</em>) are combined into one.</p>
+</li>
+<li>
+<p>One large weight matrix is used instead of multiple small weight matrices to compute $Q,K,V$.</p>
+</li>
+<li>
+<p>Thus combined weight matrices of each head : $W^Q, W^K, W^V$ are used each with shape : <code>[d_model, d_model] = [d_model, h * d_k] = [512, 512]</code>.</p>
+</li>
+<li>
+<p>A single weight matrix does the job of $W_{master}$ and all the $W_i$ matrices from the conceptual model.</p>
+</li>
+<li>
+<p>$Q_{all}$ or $Q$ and other 2 matrices are similarly computed :</p>
+</li>
+</ul>
+$$
+\begin{array}{rl}
+Q' &= QW^Q \\
+K' &= KW^K  \\
+V' &= VW^V 
+\end{array}
+$$
+<blockquote>
+<p>From here on $Q',K',V'$ are written as $Q,K,V$</p>
+</blockquote>
+<ul>
+<li>Each of these 3 tensors (matrices) are of shape : <code>[32, 50, 512]</code>.</li>
+</ul>
+<h3>2. Reshape and Transpose for Heads [Split part]</h3>
+<ul>
+<li>Currently the tensors $Q,K,V$ are of shape <code>[32, 50, 512]</code> or <code>[batch_size, seq_len, embed dim]</code>.</li>
+<li>The last dimension is <strong>reshaped</strong> into <code>[h, d_k]</code>.
+<ul>
+<li>Thus, $Q,K,V$ become of shape : <code>[32, 50, 8, 64]</code> = <code>[batch_size, seq_len, num_heads, dim_head]</code></li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p><strong>Tensor Transpose</strong> : It is about swapping dimensions.</p>
+</blockquote>
+<ul>
+<li>
+<p>eg. <code>Transpose(dim1, dim2)</code>. This will swap dimension 1 with 2.</p>
+</li>
+<li>
+<p>Transpose(seq_len, num_heads) to group all heads together for batched computation.</p>
+<ul>
+<li><code>[32, 50, 8, 64] -&gt; [32, 8, 50, 64] = [batch_size, num_heads, seq_len, dim_head]</code>.</li>
+<li><strong>This is done for all 3 $Q,K,V$</strong>.</li>
+</ul>
+</li>
+</ul>
+<hr>
+<blockquote>
+<ul>
+<li>Reasoning behind transpose :</li>
+</ul>
+</blockquote>
+<ul>
+<li>
+<p><strong>Exam Grading Analogy</strong> :</p>
+<ul>
+<li>Let there be an exam in 32 sections. <code>([batch_size])</code></li>
+<li>The exam consists of 8 questions.  <code>([seq_len])</code></li>
+<li>Teacher can check each student's paper sequentially but it will be inefficient beacuse teacher will have to constantly switch context, i.e., logic of Q.1 then Q.2 and so on.</li>
+<li>The better way will be to take all the Q.1s of all 8 students and group them in a pile and repeat the same for all the other 31 Questions.</li>
+<li>Now, pick up a pile and grade all the 32 questions of that pile.
+<ul>
+<li>It will be quicker beacuse teacher will be in the same mindset.</li>
+</ul>
+</li>
+<li>That is grading is done as a batch operation, which GPUs are optimized for.</li>
+</ul>
+</li>
+<li>
+<p>Applying this analogy to the projected tensor :</p>
+<ul>
+<li>Initial state :
+<ul>
+<li><code>[batch_size, seq_len, num_heads, dim_head]</code></li>
+<li><code>[32 students, 50 words, 8 questions, 64 features per question]</code></li>
+</ul>
+</li>
+<li>Now, <code>traspose(1, 2)</code> i.e., swap <code>seq_len</code> with <code>num_heads</code> :</li>
+<li>Resulting shape will be : <code>[batch_size, num_heads, seq_len, dim_head]</code> = <code>[32 students, 8 questions, 512 words, 64 features per question]</code></li>
+<li>The deep learning libraries like PyTorch will see <code>[batch_size, num_heads]</code> dimensions as one large batch of task.</li>
+</ul>
+</li>
+</ul>
+<p>Another way to look at this :</p>
+<ul>
+<li>Let <code>batch_size</code> = 2 (i.e. 2 sentences are being processed at once), <code>seq_len</code> = 3 and <code>num_heads</code> = 4.</li>
+<li>Before transpose, let the data in memory be arranged like this :</li>
+</ul>
+<pre><code>// batch 1
+Toeken A1 : [Head1_data, Head2_data, Head3_data, Head4_data]
+Toeken A2 : [Head1_data, Head2_data, Head3_data, Head4_data]
+Toeken A3 : [Head1_data, Head2_data, Head3_data, Head4_data]
+
+//batch 2
+Toeken B1 : [Head1_data, Head2_data, Head3_data, Head4_data]
+Toeken B2 : [Head1_data, Head2_data, Head3_data, Head4_data]
+Toeken B3 : [Head1_data, Head2_data, Head3_data, Head4_data]
+</code></pre>
+<ul>
+<li>
+<p>If calculation for <em>Head 1</em> is to be done, then GPU will have to take big jumps to access the data oh Head 1 from all the tokens.</p>
+</li>
+<li>
+<p>The data is scattered all over memory.</p>
+</li>
+<li>
+<p>After Transpose :</p>
+</li>
+</ul>
+<pre><code>// batch 1
+Head 1 : [Token A1_data, Token A2_data, Token A3_data]
+Head 2 : [Token A1_data, Token A2_data, Token A3_data]
+Head 3 : [Token A1_data, Token A2_data, Token A3_data]
+Head 4 : [Token A1_data, Token A2_data, Token A3_data]
+
+// batch 2
+Head 1 : [Token B1_data, Token B2_data, Token B3_data]
+Head 2 : [Token B1_data, Token B2_data, Token B3_data]
+Head 3 : [Token B1_data, Token B2_data, Token B3_data]
+Head 4 : [Token B1_data, Token B2_data, Token B3_data]
+</code></pre>
+<ul>
+<li>The library will see <code>[batch_size, num_heads]</code> dimensions as one large batch of task.
+<ul>
+<li>That is, it will see 2 * 4 = 8 independent problems to solve and all the data it needs is in one block.</li>
+</ul>
+</li>
+</ul>
+<hr>
+<ul>
+<li>After transpose(1,2) the tensor can be considered as <strong>a batch of (batch_size, num_heads) individual matrices each of size (seq_len, dim_head)</strong>.</li>
+<li><em><strong>This allows to perform a single, efficiet matrix multiplication that calculates the attection score for all heads and all sequences in the batch simultaneously</strong></em>.</li>
+</ul>
+<h3>3. Batch Scaled Dot-Product Attention Calculation</h3>
+<ul>
+<li>Now both $Q$ and $K$ have the same shape = <code>[batch_size, num_heads, seq_len, dim_head]</code>.</li>
+<li>$K$ will need to be transposed for computing scaled dot product attention.
+<ul>
+<li><strong>Last 2 dimensions of $K$ are transposed</strong>, resultant shape of $K^T$ : <code>[batch_size, num_heads, dim_head, seq_len]</code>.</li>
+<li>This can be done using <code>traspose(-2, -1)</code>.
+<ul>
+<li>This means to transpose / swap the last 2 dimensions.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Now $QK^T$ will result in attention score matrix of shape : <code>[batch_size, num_heads, seq_len, seq_len]</code>.
+<ul>
+<li>The matrix multiplication happens between the last 2 dimensions (<code>[50, 64]</code> &amp; <code>[64, 50]</code>).</li>
+</ul>
+</li>
+<li>Thus, in each batch there is a <code>[seq_len, seq_len]</code> shape matrix showing how much each token attends to every other token.</li>
+<li>After this the product is scaled by $\sqrt{d_k}$ which doesn't change the shape.</li>
+<li>Now the scaled dot-product is  multiplied with $V$ which is of shape : <code>[batch_size, num_heads, seq_len, dim_head]</code>.
+<ul>
+<li>Resulting shape is : <code>[batch_size, num_heads, seq_len, dim_head]</code></li>
+</ul>
+</li>
+</ul>
+<h3>4. Reverse, Reshape and Final Projection (Concatenation):</h3>
+<ul>
+<li>
+<p>The final output of the MHA layer which will be the input of the next layer (FFN) needs to be of shape <code>[batch_size, seq_len, d_model]</code>.</p>
+</li>
+<li>
+<p>To convert the current tensor :</p>
+<ol>
+<li>Reverse the transpose.</li>
+<li>Concatenate the Heads.</li>
+</ol>
+</li>
+<li>
+<p>After traspose(1,2) shape will become : <code>[batch_size, seq_len, num_heads, dim_head]</code></p>
+<ul>
+<li>(<code>[32, 8, 50, 64]</code> -&gt; <code>[32, 50, 8, 64]</code>).</li>
+</ul>
+</li>
+<li>
+<p>The concatenation of last 2 dimensions is done by <code>reshape</code> or <code>view</code> operation.</p>
+<ul>
+<li>eg. <code>reshape(batch_size, seq_len, num_heads * dim_head)</code></li>
+</ul>
+</li>
+<li>
+<p>The final shape is : <code>[32, 50, 512]</code> (8 * 64 = 512).</p>
+</li>
+<li>
+<p>This tensor will be passed through the final linear projection $W^O$ of shape <code>[512, 512]</code>.</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>Why the final linear projection is used?</strong></p>
+</blockquote>
+<ul>
+<li>The re-shaped / concatenated vector lays the output vectors of each head nect to each other.
+<ul>
+<li>Head 1's output is at indices : 0-64</li>
+<li>Head 2's output is at indices : 65-127, and so on.</li>
+</ul>
+</li>
+<li>Information from each head has not yet interacted with other head's information/</li>
+<li>$W^O$ learns an optimal eay to combine and mix these parallel outputs.
+<ul>
+<li>It synthesizes the information from all heads into a single useful representation.</li>
+<li>It can learn to weigh some heads more than others and find relationships between their outputs.</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>We now end up with a tensor of same shape as the one which was the input to the MHA, but it is enriched with contextual information from the attention mechanism.</p>
+</blockquote>
+<img src="/static/images/Transformer7.png" alt="Image" width="800" height="850">
+<h1>6. Masked Multi-Head Attention</h1>
+<p>It is used in the <strong>decoder block</strong> of the transformer model. It is used to allow the decoder to process sequences in parallel while preserving the <strong>autoregressive property</strong> of transformers.</p>
+<blockquote>
+<p><strong>Auto-Regressive Property</strong> :</p>
+</blockquote>
+<ul>
+<li>
+<p>When a sequence is being generated the prediction for next word should depend on the words that <strong>came before</strong> it and not the words that will come after.</p>
+</li>
+<li>
+<p>The model should be forbidden from <strong>peeking ahead</strong> at any subsequent words.</p>
+</li>
+<li>
+<p>This is enforced using <strong>mask</strong>.</p>
+</li>
+<li>
+<p>The <em>mask</em> or <strong>look-ahead mask</strong> is applied inside each attention head, <strong>before softmax step</strong>.</p>
+</li>
+<li>
+<p>This mask is also called <strong>causal mask</strong> and <strong>triangular mask</strong>.</p>
+</li>
+</ul>
+<blockquote>
+<p>In a given query, at position $i$, we want to prevent the model from attending to any key ($K$ value) at a position $j$ &gt; $i$.</p>
+</blockquote>
+<h3>1. Create a Mask Matrix :</h3>
+<ul>
+<li>
+<p>A square matrix $M$ of size $ n \times n $ is created where $n$ is the sequence length.</p>
+</li>
+<li>
+<p>The positions which are needed / need attending to in the sequence are filled with 0 in $M$ and the positions which are to be masked are filled with $ - \infty $. [It can be a very large negative number. eg. <code>-1e9</code>].</p>
+</li>
+<li>
+<p>For $n = 4$, $M$ will be :</p>
+</li>
+</ul>
+$$
+ M = \begin{pmatrix}
+0 & -\infty & -\infty & -\infty \\
+0 & 0 & -\infty & -\infty \\
+0 & 0 & 0 & -\infty \\
+0 & 0 & 0 & 0
+\end{pmatrix} 
+$$
+<ul>
+<li>It is thus an upper-triangular matrix of $-\infty$.</li>
+</ul>
+<h3>2. Apply the mask to scaled scores :</h3>
+$$ \text{Masked Scores} = \frac{QK^T}{\sqrt{d_k}} + M $$
+<h3>3. Working of the Mask :</h3>
+$$ softmax(z_i) = \frac{e^{z_i}}{\sum_j e^{z_j}} $$
+<ul>
+<li>
+<p>If the score is $z_j$ corresponds to a position which is to be masked, then it's value will be $ -\infty $.</p>
+</li>
+<li>
+<p>Thus, $ e^{z_j} $ will become $ e^{- \infty} $ which equals $ \frac{1}{\infty} \approx 0 $.</p>
+</li>
+<li>
+<p>This prevents / nullifies the attention to that position.</p>
+</li>
+<li>
+<p>This ensures that :</p>
+<ul>
+<li>For the first word (row 1), it can only attend to itself.</li>
+<li>For the second word (row 2), it can attend to the first word and itself.</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p><em><strong>Example</strong></em> :</p>
+</blockquote>
+<ul>
+<li>Let the <strong>scaled score matrix</strong> ($ \frac{QK^T}{\sqrt{d_k}} $) be :
+$$
+S = \begin{pmatrix}
+1.2 & 0.5 & -1.0 & 0.0 \\
+0.3 & 2.0 & 0.1 & -0.5 \\
+-0.8 & 0.7 & 1.5 & 0.2 \\
+1.0 & -1.2 & 0.3 & 0.8
+\end{pmatrix}
+$$
+<br><br></li>
+<li>Let the <strong>mask matrix</strong> be :
+$$
+ M = \begin{pmatrix}
+0 & -\infty & -\infty & -\infty \\
+0 & 0 & -\infty & -\infty \\
+0 & 0 & 0 & -\infty \\
+0 & 0 & 0 & 0
+\end{pmatrix} 
+$$
+<br><br></li>
+<li>Adding them will give the masked scaled score matrix :
+$$
+S' = \begin{pmatrix}
+1.2 & .-\infty & -\infty & -\infty \\
+0.3 & 2.0 & -\infty & -\infty \\
+-0.8 & 0.7 & 1.5 & -\infty \\
+1.0 & -1.2 & 0.3 & 0.8
+\end{pmatrix}
+$$
+<br><br></li>
+<li>Now softmax is applied to each row of $S'$.</li>
+<li>For row 0 : $ softmax([1.2, -\infty, -\infty, -\infty]) $ = [1, 0, 0, 0].</li>
+<li>For row 1 : $ softmax([0.3, 2.0, -\infty, -\infty]) = \frac{1}{e^{0.3} + e^{2.0}} [e^{0.3}, e^{2.0}] = [0.1544, 0.8456, 0, 0] $</li>
+<li>And so on ...
+<br></li>
+<li>Final $A$ matrix is :
+$$
+A = \begin{pmatrix}
+1.000 & 0.000 & 0.000 & 0.000 \\
+0.154 & 0.845 & 0.000 & 0.000 \\
+0.065 & 0.290 & 0.645 & 0.000 \\
+0.412 & 0.046 & 0.205 & 0.337
+\end{pmatrix}
+$$
+<br><br></li>
+<li>This can be interpreted as :
+<ul>
+<li>In Row 0 (token 0), it can only attend to itself.</li>
+<li>In Row 1 (token 1), it can attend 15% to token 0, 84% to itself and cannot attend to other tokens.</li>
+</ul>
+</li>
+</ul>
+<h3>4. Implementation using Multi-Heads :</h3>
+$$ head_i = softmax(\frac{Q_i K_i^T}{\sqrt{d_k}} + M) V_i $$
+<ul>
+<li>The same mask is applied 8 separate times to 8 different <code>[32, 50, 50]</code> score matrices.</li>
+</ul>
+<blockquote>
+<p>In <strong>practical approach</strong> the masking is applied once, inside the single Batched Scaled Dot-Product Attention function.</p>
+</blockquote>
+<ul>
+<li><code>attn_scores = Q @ K.transpose(-2,-1)</code> is calculated and it is of shape : <code>[batch_size, num_heads, seq_len, seq_len] = [32, 8, 50, 50]</code>.</li>
+<li>Now, the mask of shape <code>[50, 50]</code> is broadcasted across the <code>batch_size</code> and <code>num_heads</code> dimensions, to match 4D shape of the scores.</li>
+<li><code>[1, 1, 50, 50]</code> is the final shape of the mask.
+<ul>
+<li>It is done automatically by deep learning libraries.</li>
+</ul>
+</li>
+<li>The broadcasted mask is applied and it updates <code>attn_scores</code> to $-\infty$ where the braoadcasted mask is 0.</li>
+<li><strong>This happens to the entire tensor in one shot</strong>.</li>
+</ul>
+<hr>
+<h2>Broadcasting</h2>
+<ul>
+<li>It describes a set of rules on how to perform <strong>element-wise operations</strong> on tensors of different, but compatible, shapes <em>without without explicitly copying data</em>.</li>
+<li>It is done automatically by libraries like PyTorch for operations like addition, subtraction, multiplication, etc.</li>
+<li>Broadcasting follows <em>2 rules</em> which are checked from right-most (trailing) dimension to left-most (leading) dimension.
+<ol>
+<li><strong>Align Dimension</strong>
+<ul>
+<li>If the 2 tensors have <em>different number of dimensions</em>, the <strong>smaller tensor is padded with dimensions of size 1 on its left</strong> until both tensors have equal number of dimensions.</li>
+</ul>
+</li>
+<li><strong>Check Dimension Compatibility</strong>
+<ul>
+<li>Now that both tensors have same number of dimensions, for each dimension the <strong>one of the following must be true</strong> :
+<ul>
+<li>The <em>dimensions are equal</em>.</li>
+<li><em>One of the dimensions is 1</em>.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+</li>
+</ul>
+<blockquote>
+<ul>
+<li>If both rules are satified for all dimensions then the tensors are <strong>broadcast-compatible</strong>.</li>
+</ul>
+</blockquote>
+<ul>
+<li>
+<p>PyTorch will virtually <strong>stretch (or repeat)</strong> the smaller tensor along any dimension where its size is 1 to match the larger tensor.</p>
+</li>
+<li>
+<p>No actual data is copied and unnecessary data duplication is avoided.</p>
+</li>
+</ul>
+<h3>How is it done in MHA-Masking :</h3>
+<ul>
+<li><code>attn_scores</code> is of shape : <code>[batch_size, num_heads, seq_len, seq_len]</code>.
+<ul>
+<li>eg. <code>[32, 8, 50, 50]</code></li>
+</ul>
+</li>
+<li><code>mask</code> is of shape : <code>[seq_len, seq_len]</code>
+<ul>
+<li>eg. <code>[50, 50]</code></li>
+</ul>
+</li>
+</ul>
+<h5>1. Write down the shapes aligned to right :</h5>
+<ul>
+<li><code>attn_score</code>  : <code>[32, 8, 50, 50]</code></li>
+<li><code>mask</code>        : <code>[  ,  , 50, 50]</code></li>
+</ul>
+<h5>2. Apply rule 1 (aligning the dimensions) :</h5>
+<ul>
+<li><code>attn_score</code>  : <code>[32, 8, 50, 50]</code></li>
+<li><code>mask</code>        : <code>[ 1, 1, 50, 50]</code></li>
+</ul>
+<h4>3. Apply rule 2 (check compatibility) :</h4>
+<ul>
+<li>
+<p><code>dim(-1)</code> : 50 = 50. Thus they are equal.</p>
+</li>
+<li>
+<p><code>dim(-2)</code> : 50 = 50. Thus they are equal.</p>
+</li>
+<li>
+<p><code>dim(-3)</code> : One of them is 1.</p>
+</li>
+<li>
+<p><code>dim(-4)</code> : One of them is 1.</p>
+</li>
+<li>
+<p>Thus, both the vectors are compatible.</p>
+</li>
+<li>
+<p>Now, the tensor of shape <code>[1, 1, 50, 50]</code> is stretched along <code>dim(-3)</code> to the shape : <code>[1, 8, 50, 50]</code>.</p>
+</li>
+<li>
+<p>The resultant tensor is stretched along <code>dim(-4)</code> to the shape of the <code>attn_score</code> : <code>[32, 8, 50, 50 ]</code></p>
+</li>
+</ul>
+<img src="/static/images/Transformer8.png" alt="Image" width="500" height="250">
+<h1>7. Types of MHA Used</h1>
+<ul>
+<li>In transformer architecture, there are 3 ways in which Multi-Head Attention is utilized :
+<ol>
+<li>Self Attention</li>
+<li>Cross Attention</li>
+<li>Masked Atention (Already covered above)</li>
+</ol>
+</li>
+</ul>
+<h2>Self Attention</h2>
+<ul>
+<li>When the query, keys, and values all come from the same sequence / place (output of the previous layer), the mechanism is known as self-attention.</li>
+<li>These layers are present in the <em>Encoder</em> block.</li>
+<li>A word in the sentence will <strong>attend to all words / positions in the previous layer of the encoder</strong>.</li>
+</ul>
+<h2>Cross Attention / Encoder-Decoder Attention</h2>
+<ul>
+<li>It is the MHA layer of the <em>Decoder</em> stack, which comes just after the Masked MHA.</li>
+<li>The <strong>Queries</strong> come from the previous <em>decoder</em> layer,</li>
+<li>The <strong>Keys</strong> and <strong>Values</strong> come from the output of the <em>encoder</em>.</li>
+<li>This allows the model to attend to all the positions in the previous layer of the encoder.</li>
+</ul>
+<img src="/static/images/Transformer9.png" alt="Image" width="800" height="280">
+<h1>8. Embedding &amp; Positional Encoding</h1>
+<h2>Embeddings</h2>
+<ul>
+<li>
+<p>There are 2 Embedding layers :
+a. Convert input tokens to vectors
+b. Convert target tokens to vectors</p>
+</li>
+<li>
+<p><strong>Both these layers share their weight matrix</strong>.</p>
+</li>
+<li>
+<p>They also share their weight with the final linear layer that transforms the decoder's hidden states into logits over the vocabulary before applying softmax.</p>
+</li>
+</ul>
+<blockquote>
+<ul>
+<li>Each token is mapped to a vector via the embedding matrix $ E \in \mathbb{R}^{V \times d_{model}} $.
+- $V$ is the vocabulary size.
+- It is the total number of unique tokens in the vocabulary.</li>
+</ul>
+</blockquote>
+<ul>
+<li>When the $i^{th}$ token comes, the $i^{th}$ row is looked in $E$.</li>
+<li>This vector / row of size $d_{model}$ is the embedding vector of that token.</li>
+<li>This vector is scaled by $ d_{model} $ through element-wise multiplication.
+<br></li>
+<li>It is done to normalize variance.</li>
+</ul>
+<h2>Positional Encoding</h2>
+<h3>Need of Positional Encoding (PE) :</h3>
+<ul>
+<li>Transformers don't have any notion of sequence order.</li>
+<li>They process all tokens in parallel.</li>
+<li>Thus, the model needs a way to know which word comes before or after another word.</li>
+</ul>
+<blockquote>
+<ul>
+<li><strong>Requirements</strong>
+- Positional Encodings must be same for a position irresepective of the sequence lenghts or the input sequnce.
+- They must not be too large else they may push the embedding vectors in such a way that their semantic similarity may change.</li>
+</ul>
+</blockquote>
+<h3>Working of PE :</h3>
+<blockquote>
+<p>The method used in the paper used fixed non-trainable PE. Newer models used learnable PE.</p>
+</blockquote>
+<ul>
+<li>Use <strong>sine and cosie functions of different frequencies to encode positions</strong>.</li>
+<li>PE can be thought of as an address vector of each token in the sequence.</li>
+</ul>
+<blockquote>
+<p>Positional Encoding vector is <strong>added and not concatenated</strong> to the Embedding vector.</p>
+</blockquote>
+<ul>
+<li>Waves are used to create the address vectors.</li>
+</ul>
+$$ PE_{(pos,2i)} = \sin\left( \frac{pos}{10000^{\frac{2i}{d_{model}}}} \right) $$
+$$ PE_{(pos,2i+1)} = \cos\left( \frac{pos}{10000^{\frac{2i}{d_{model}}}} \right) $$
+<ul>
+<li>
+<p>$pos$ : position of the token in the sentence.</p>
+</li>
+<li>
+<p>$i$ : dimension index of the embedding vector.</p>
+<ul>
+<li><code>i = 0</code> is the first dimension.</li>
+<li>...</li>
+<li><code>i = 255</code> is the last dimension. (if $d_{model} = 512$)</li>
+</ul>
+</li>
+<li>
+<p>$i$ can be thought of as an <strong>index of for a pair of dimensions</strong>.</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>Analogy</strong></p>
+</blockquote>
+<ul>
+<li>
+<p>A clock has 3 hands each moving at a different frequency.</p>
+</li>
+<li>
+<p>Each hands gives more information about what the time is.
+<br></p>
+</li>
+<li>
+<p>Same logic is being applied here, <strong>each dimension of each embedded vector at position &quot;pos&quot; forms a different argument or frequency for the sine / cosine functions</strong>.</p>
+</li>
+<li>
+<p>For a token at a specific position <em>pos</em>, a Positional Encoding (PE) vector of the same dimension as the token embedding (d_model) is created.</p>
+</li>
+<li>
+<p>The entries of this PE vector are found as follows:</p>
+<ol>
+<li>An iterator, let's call it $i$, runs from <code>0</code> to <code>d_model / 2 - 1</code>.</li>
+<li>For each value of $i$, a unique frequency is defines.</li>
+<li>This frequency is used to create one pair of waves: a sine wave and a cosine wave.</li>
+<li>The sine wave's value is placed in dimension <code>2i</code> of the vector, and the cosine wave's value is placed in dimension <code>2i+1</code>.</li>
+<li>For a given position <em>pos</em>, its corresponding point on each of these <code>d_model</code> total waves is calculated.</li>
+<li>These <code>d_model</code> points form the entries of the <em>final PE vector</em> for that position <em>pos</em>.</li>
+</ol>
+</li>
+</ul>
+<h4>Example</h4>
+<ul>
+<li><code>d_model</code> = 6. Thus, $i$ goes from 0 to 2 (6/2 -1).</li>
+<li>Thus there are 3 frequency pairs each consisting of a sine and a cosine wave.</li>
+</ul>
+<img src="/static/images/Transformer10.png" alt="Image" width="650" height="400">
+<h3>Visualizing Positional Encoding</h3>
+<pre tabindex="0" style="color:#d8dee9;background-color:#2e3440;"><code><span style="display:flex;"><span><span style="color:#81a1c1;font-weight:bold">def</span> <span style="color:#88c0d0">pe</span><span style="color:#eceff4">(</span>max_seq_len<span style="color:#eceff4">,</span> d_model<span style="color:#eceff4">):</span>
+</span></span><span style="display:flex;"><span>    pe <span style="color:#81a1c1">=</span> np<span style="color:#81a1c1">.</span>zeros<span style="color:#eceff4">((</span>max_seq_len<span style="color:#eceff4">,</span> d_model<span style="color:#eceff4">))</span>
+</span></span><span style="display:flex;"><span>    pos <span style="color:#81a1c1">=</span> np<span style="color:#81a1c1">.</span>arrange<span style="color:#eceff4">(</span><span style="color:#b48ead">0</span><span style="color:#eceff4">,</span> max_seq_len<span style="color:#eceff4">,</span> dtype<span style="color:#81a1c1">=</span>np<span style="color:#81a1c1">.</span>float32<span style="color:#eceff4">)</span><span style="color:#81a1c1">.</span>reshape<span style="color:#eceff4">(</span><span style="color:#81a1c1">-</span><span style="color:#b48ead">1</span><span style="color:#eceff4">,</span><span style="color:#b48ead">1</span><span style="color:#eceff4">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    div_term <span style="color:#81a1c1">=</span> np<span style="color:#81a1c1">.</span>exp<span style="color:#eceff4">(</span>np<span style="color:#81a1c1">.</span>arrange<span style="color:#eceff4">(</span><span style="color:#b48ead">0</span><span style="color:#eceff4">,</span> d_model<span style="color:#eceff4">,</span> <span style="color:#b48ead">2</span><span style="color:#eceff4">)</span><span style="color:#81a1c1">.</span>astype<span style="color:#eceff4">(</span>np<span style="color:#81a1c1">.</span>float32<span style="color:#eceff4">)</span> <span style="color:#81a1c1">*</span> <span style="color:#81a1c1">-</span><span style="color:#eceff4">(</span>np<span style="color:#81a1c1">.</span>log<span style="color:#eceff4">(</span><span style="color:#b48ead">10000.0</span><span style="color:#eceff4">)</span> <span style="color:#81a1c1">/</span> d_model<span style="color:#eceff4">))</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#616e87;font-style:italic"># Apply sin to even indices (2i)</span>
+</span></span><span style="display:flex;"><span>    pe<span style="color:#eceff4">[:,</span> <span style="color:#b48ead">0</span><span style="color:#eceff4">::</span><span style="color:#b48ead">2</span><span style="color:#eceff4">]</span> <span style="color:#81a1c1">=</span> np<span style="color:#81a1c1">.</span>sin<span style="color:#eceff4">(</span>position <span style="color:#81a1c1">*</span> div_term<span style="color:#eceff4">)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#616e87;font-style:italic"># Apply cos to odd indices (2i + 1)</span>
+</span></span><span style="display:flex;"><span>    pe<span style="color:#eceff4">[:,</span> <span style="color:#b48ead">1</span><span style="color:#eceff4">::</span><span style="color:#b48ead">2</span><span style="color:#eceff4">]</span> <span style="color:#81a1c1">=</span> np<span style="color:#81a1c1">.</span>cos<span style="color:#eceff4">(</span>position <span style="color:#81a1c1">*</span> div_term<span style="color:#eceff4">)</span>
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#81a1c1;font-weight:bold">return</span> pe
+</span></span><span style="display:flex;"><span>max_seq_len <span style="color:#81a1c1">=</span> <span style="color:#b48ead">100</span>
+</span></span><span style="display:flex;"><span>d_model <span style="color:#81a1c1">=</span> <span style="color:#b48ead">128</span>
+</span></span><span style="display:flex;"><span>pe_matrix <span style="color:#81a1c1">=</span> pe<span style="color:#eceff4">(</span>max_seq_len<span style="color:#eceff4">,</span> d_model<span style="color:#eceff4">)</span>
+</span></span></code></pre><img src="/static/images/Transformer11.png" alt="Image" width="650" height="400">
+<h3>Practical Implementation</h3>
+<p>In the above code the <code>numpy</code> line : <code>div_term = np.exp(np.arrange(0, d_model, 2).astype(np.float32) * -(np.log(10000.0) / d_model))</code> is written in <code>PyTorch</code> like :</p>
+<pre tabindex="0" style="color:#d8dee9;background-color:#2e3440;"><code><span style="display:flex;"><span>div_term <span style="color:#81a1c1">=</span> torch<span style="color:#81a1c1">.</span>exp<span style="color:#eceff4">(</span>torch<span style="color:#81a1c1">.</span>arange<span style="color:#eceff4">(</span><span style="color:#b48ead">0</span><span style="color:#eceff4">,</span> d_model<span style="color:#eceff4">,</span> <span style="color:#b48ead">2</span><span style="color:#eceff4">)</span><span style="color:#81a1c1">.</span>float<span style="color:#eceff4">()</span> <span style="color:#81a1c1">*</span> <span style="color:#eceff4">(</span><span style="color:#81a1c1">-</span>math<span style="color:#81a1c1">.</span>log<span style="color:#eceff4">(</span><span style="color:#b48ead">10000.0</span><span style="color:#eceff4">)</span> <span style="color:#81a1c1">/</span> d_model<span style="color:#eceff4">))</span> <span style="color:#616e87;font-style:italic"># (d_model / 2)</span>
+</span></span></code></pre><ul>
+<li>The denominator in the paper is :</li>
+</ul>
+$$ 10000^{\frac{2i}{d_{model}}} $$
+<p>It is same as :</p>
+$$ \exp\left ( -\ln{(10000)} \cdot \frac{2i}{d_{model}} \right ) $$
+<ul>
+<li>Using <code>exp</code> and <code>log</code> is more stable for floating point calculations for very large or small numbers.</li>
+<li><code>torch.exp()</code> is vectorized and optimized.</li>
+</ul>
+<hr>
+<h1>Detailed Flow of Information in Transformer</h1>
+<p>Now that all the major parts of the transformer are covered, it's time to see how information flows through the transformer. This is going to be a high level description of the first diagram.</p>
+<h2>Encoder</h2>
+<ul>
+<li>
+<p>Sentences are encoded using <strong>Byte Pair Encoding (BPE)</strong>.</p>
+<ul>
+<li>In this algorithm, most frequent pairs of bytes (chars) are iteratively merged to form larger units.</li>
+</ul>
+</li>
+<li>
+<p>The encoded token sequences of similar length are grouped in batchesto avoid wasting computation on padding tokens for shorted sentences.</p>
+</li>
+<li>
+<p>Once encoded, the <strong>Positional Encoding</strong> is added to the Embedding matrix.</p>
+</li>
+<li>
+<p>Now the tokens are fed into the the main encoder block.</p>
+</li>
+<li>
+<p><strong>Multi Head Self Attention</strong> is performed on the input.</p>
+</li>
+<li>
+<p>After this the output from the MHA layer as well as the original input are added via the skip connections and layer normalization is performed.</p>
+<ul>
+<li>Skip connection help in maintaining the positional encoding through the models depth.</li>
+</ul>
+</li>
+<li>
+<p>Then the information flows through a <strong>Position Wise Feed Forward NN</strong> and agian the input and the out of this layer are added and layer normalization is performed.</p>
+</li>
+</ul>
+<blockquote>
+<p>Now the encoders can be stacked, where output from one encoder becomes the input of the next encoder.</p>
+</blockquote>
+<h2>Decoder</h2>
+<h3>During Training</h3>
+<ul>
+<li><strong>Teacher Forcing Method</strong> is used during training where the entire ground truth output sequence is fed to the decoder at once.</li>
+<li>Ground truth values added with the positional encoding are fed into Masked Multi-Head Self Attention and the output is a sequence where each token has attended to the preceding tokens.</li>
+<li>This output is used to generate the <strong>Query</strong> vectors the next sub-layer <strong>Encoder-Decoder Attention</strong>.</li>
+<li>The <strong>Key</strong> and <strong>Value</strong> for this layer comes from the Enocoder's output.</li>
+<li>The output from the cross attention layer is fed into the <strong>Feed-Forward Layer</strong>.</li>
+<li>The final output is passed through a linear layer and then a softmax function to produce a probability distribution over the entire vocabulary for each position in the output sequence.</li>
+</ul>
+<blockquote>
+<p>The loss is then calculated by comparing these predicted probabilities with the actual next tokens in the ground-truth sequence.</p>
+</blockquote>
+<h3>During Inference (Auto-Regressive)</h3>
+<ul>
+<li>The decoder's first input is the start token <code>&lt;sos&gt;</code>. It is converted to into an embedding and PE is added to it.</li>
+<li>It is the input to the the Masked Muti Head Self Attention.</li>
+<li>The output acts as the query and it attends to the keys and values vectors from the encoder.</li>
+<li>Then same as in training phase the output is passed through the FFN and then a linear layer follwed by softmax prediction.</li>
+<li>The predicted token is then appended to the exisiting sequence of generated sequence.</li>
+<li>This new sequence then becomes the input to masked MHA layer in the next step.</li>
+<li>This process is continued till the final end of sequence token <code>&lt;eos&gt;</code> is not generated.</li>
+</ul>
+<img src="/static/images/Transformer12.png" alt="Image" width="800" height="1500">
+<hr>
+<h2>References</h2>
+<ul>
+<li><a href="https://arxiv.org/pdf/1706.03762" target="_blank" rel="noopener noreferrer">Attention Is All You Need</a></li>
+<li><a href="https://maharshi.bearblog.dev/informal-approach-to-attention-in-transformers/" target="_blank" rel="noopener noreferrer">Informal approach to attention mechanisms</a></li>
+<li><a href="https://stats.stackexchange.com/questions/421935/what-exactly-are-keys-queries-and-values-in-attention-mechanisms" target="_blank" rel="noopener noreferrer">What exactly are keys, queries, and values in attention mechanisms?</a></li>
+<li><a href="https://erdem.pl/2021/05/understanding-positional-encoding-in-transformers" target="_blank" rel="noopener noreferrer">Understanding Positional Encoding in Transformers</a></li>
+<li><a href="https://nlp.seas.harvard.edu/annotated-transformer/" target="_blank" rel="noopener noreferrer">The Annotated Transformer</a></li>
+<li><a href="https://jalammar.github.io/illustrated-transformer/" target="_blank" rel="noopener noreferrer">The Illustrated Transformer</a></li>
+<li><a href="https://www.deeplearning.ai/short-courses/how-transformer-llms-work/?utm_campaign=handsonllm-launch&amp;utm_medium=partner" target="_blank" rel="noopener noreferrer">How Transformer LLMs Work</a></li>
+<li><a href="https://www.deeplearning.ai/short-courses/attention-in-transformers-concepts-and-code-in-pytorch/" target="_blank" rel="noopener noreferrer">Attention in Transformers: Concepts and Code in PyTorch</a></li>
+</ul>
+
+            </article>
+        
+    </main>
+
+    <script defer src="/blog-temp/static/js/katex.min.js"></script>
+    <script defer src="/blog-temp/static/js/auto-render.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\(', right: '\\)', display: false},
+                    {left: '\\[', right: '\\]', display: true}
+                ],
+                throwOnError : false
+            });
+        });
+    </script>
+</body>
+</html>
